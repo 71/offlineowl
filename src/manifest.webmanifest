@@ -1,0 +1,10 @@
+{
+  "name": "Offline Owl",
+  "short_name": "Offline Owl",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#fff",
+  "theme_color": "#aaa",
+  "icons": []
+}

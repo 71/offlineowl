@@ -1,0 +1,28 @@
+{
+  "name": "offlineowl",
+  "version": "1.0.0",
+  "description": "Offline Duolingo vocabulary.",
+  "main": "index.js",
+  "repository": "https://github.com/71/offlineowl",
+  "author": "Grégoire Geis",
+  "license": "Unlicense",
+  "scripts": {
+    "build": "parcel build src/index.pug",
+    "start": "parcel src/index.pug"
+  },
+  "devDependencies": {
+    "@material/textfield": "^1.1.1",
+    "@mdi/js": "^3.6.95",
+    "idb-keyval": "^3.2.0",
+    "material-components-web": "^1.1.1",
+    "parcel-bundler": "^1.12.3",
+    "parcel-plugin-sw-precache": "^1.1.1",
+    "pug": "^2.0.3",
+    "ricochet": "file:../ricochet",
+    "stylus": "^0.54.5",
+    "typescript": "^3.4.3"
+  },
+  "browserslist": [
+    "since 2018-06"
+  ]
+}
