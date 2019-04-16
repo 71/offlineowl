@@ -154,7 +154,7 @@ export function App({ db }: AppProps) {
                 <div class='related'>
                   { item.related.map(x =>
                     <div>
-                      <a href='#' onclick={goToWord} data-id={x}>{db.words[x].word}</a>
+                      <a href='#' onclick={goToWord} data-id={x.id}>{x.word}</a>
                     </div>
                   ) }
                 </div>

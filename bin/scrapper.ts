@@ -1,18 +1,20 @@
-import { User, DictionaryItem, Completion } from './types'
+import { User, DictionaryItem, Skill } from './types'
 
-import { LanguageTrack, Lesson, WordId, Word } from '../app/ts/db'
+import { serializeLesson, serializeWord, serializeLanguageTrackHeader, Lesson, Word, WriteStream } from '../app/ts/db'
 
 const fetch: typeof window.fetch = require('node-fetch')
 const MAX_PARALLEL_REQUESTS = 10
 
 
 export class Scrapper {
+  private readonly words = new Map<string, Word>()
+  private readonly lessons = new Map<string, Lesson>()
+
   failures = 0
 
-  readonly items = [] as DictionaryItem[]
-  readonly completions = [] as Completion[]
-
   readonly lookupQueue: [string, string][] = []
+
+  constructor(readonly out: WriteStream) {}
 
   private reportFailure() {
     if (this.failures++ > 20) {
@@ -21,6 +23,82 @@ export class Scrapper {
 
       process.exit(3)
     }
+  }
+
+  private idToWord(id: string) {
+    let word = this.words.get(id)
+
+    if (word !== undefined)
+      return word
+
+    this.words.set(id, word = new Word(this.words.size))
+
+    return word
+  }
+
+  private dicItemToWord(item: DictionaryItem) {
+    let word = this.words.get(item.lexeme_id)
+
+    if (word === undefined)
+      this.words.set(item.lexeme_id, word = new Word(this.words.size))
+    else if (word.word !== undefined)
+      return word
+
+    word.word = item.word
+    word.translations = item.translations
+    word.examples = item.alternative_forms.map(x => ({ sentence: x.example_sentence, translation: x.translation }))
+    word.related = item.related_lexemes.map(x => this.idToWord(x.url.substr(x.url.lastIndexOf('/') + 1)))
+
+    serializeWord(this.out, word)
+
+    return word
+  }
+
+  private skillToLesson(skill: Skill, lang: string) {
+    let lesson = this.lessons.get(skill.id)
+
+    if (lesson === undefined)
+      this.lessons.set(skill.id, lesson = new Lesson(this.lessons.size))
+    else if (lesson.name !== undefined)
+      return lesson
+
+    const words = new Set<Word>()
+    const original = skill.progress_v3_debug_info.original_debug_info
+
+    for (const i in skill.progress_v3_debug_info.lexeme_ids_by_lesson)
+    for (const word of skill.progress_v3_debug_info.lexeme_ids_by_lesson[i]) {
+      const w = this.idToWord(word)
+
+      if (w.word === undefined)
+        this.lookupQueue.push([lang, word])
+
+      words.add(w)
+    }
+
+    if (original !== undefined) {
+      for (const i in original.lexeme_ids_by_lesson)
+      for (const word of original.lexeme_ids_by_lesson[i]) {
+        const w = this.idToWord(word)
+
+        if (w.word === undefined)
+          this.lookupQueue.push([lang, word])
+
+        words.add(w)
+      }
+    }
+
+    lesson.name = skill.name
+    lesson.title = skill.title
+    lesson.shortName = skill.short
+    lesson.explanation = skill.explanation || ''
+    lesson.dependencies = skill.dependencies_name.map(name => [...this.lessons.values()].find(x => x.name === name)!)
+    lesson.words = [...words]
+
+    // ^ Since we take the time to sort dependencies before hand, we know that all lessons we depend on
+    //   have already been serialized.
+    serializeLesson(this.out, lesson)
+
+    return lesson
   }
 
   async fetchDictionaryItem(id: string, intoLanguage: string) {
@@ -43,52 +121,9 @@ export class Scrapper {
     }
   }
 
-  async fetchCompletion<A extends string, B extends string>(word: string, languageId: A, uiLanguageId: B) {
-    try {
-      const res = await fetch(`https://duolingo-lexicon-prod.duolingo.com/api/1/complete?languageId=${languageId}&query=${word}&uiLanguageId=${uiLanguageId}`)
-
-      if (!res.ok) {
-        this.reportFailure()
-
-        return `Error fetching completions for '${word}': ${res.statusText || `Error ${res.status}`}.`
-      }
-
-      return Object.assign(await res.json() as Completion<A, B>, { word, languageId, uiLanguageId })
-    } catch {
-      return `Could not find completions for word ${word}.`
-    }
-  }
-
-  async addFromQueue() {
-    const queue: [string, string][] = []
-
-    for (const [lang, id] of this.lookupQueue.splice(0)) {
-      if (queue.some(x => x[0] === lang && x[1] === id))
-        continue
-      if (this.items.some(x => x.lexeme_id === id))
-        continue
-
-      queue.push([lang, id])
-    }
-
-    console.error('[i] Adding at most', queue.length, 'item(s) from queue.')
-
-    const tasks = queue.map(async ([lang, id]) => {
-      const item = await this.fetchDictionaryItem(id, lang)
-
-      if (typeof item === 'string')
-        return console.error('[-] Not adding item:', item)
-
-      console.error('[+] Adding', item)
-      this.addWord(item)
-    })
-
-    for (let i = 0; i < tasks.length; i += MAX_PARALLEL_REQUESTS)
-      await Promise.all(tasks.slice(i, i + MAX_PARALLEL_REQUESTS))
-  }
-
-  async fetchUserData(username: string) {
-    const res = await fetch(`https://www.duolingo.com/users/${username}`)
+  async fetchUserData(username: string, langId?: string) {
+    const opts = langId === undefined ? {} : { headers: { Cookie: `lang=${langId}` } }
+    const res = await fetch(`https://${langId || 'www'}.duolingo.com/users/${username}?learning_language=ja`, opts)
 
     if (!res.ok) {
       this.reportFailure()
@@ -99,119 +134,92 @@ export class Scrapper {
     return await res.json() as User
   }
 
-  async scrapeUser(user: User, language: string, intoLanguage: string) {
-    const lang = user.language_data[language]
-    const ids: string[] = []
-
-    for (const skill of lang.skills)
-    for (const lesson in skill.progress_v3_debug_info.lexeme_ids_by_lesson)
-    for (const id of skill.progress_v3_debug_info.lexeme_ids_by_lesson[lesson]) {
-      if (ids.indexOf(id) === -1 && !this.items.some(x => x.lexeme_id === id))
-        ids.push(id)
-    }
-
-    console.error('[i] Found', ids.length, 'item(s) to scrape.')
-
-    for (let i = 0; i < ids.length; i += MAX_PARALLEL_REQUESTS)
-      await Promise.all(
-        ids.slice(i, i + MAX_PARALLEL_REQUESTS).map(async id => {
-          const item = await this.fetchDictionaryItem(id, intoLanguage)
-
-          if (typeof item === 'string')
-            return console.error('[-]', item)
-
-          this.addWord(item)
-        })
-      )
-  }
-
-  addCompletion(completion: Completion) {
-    this.completions.push(completion)
-  }
-
   addWord(word: DictionaryItem) {
-    this.items.push(word)
+    this.dicItemToWord(word)
     this.lookupQueue.push(...word.related_lexemes.map(x => [word.from_language, x.url.substr(x.url.lastIndexOf('/') + 1)] as [string, string]))
   }
 
-  async createDbLanguageTrack(user: User, learningLanguageId: string, userLanguageId: string, userLanguage: string): Promise<LanguageTrack> {
-    console.error('[i] Creating db.json file for', learningLanguageId, '/', userLanguageId + '.')
+  async addFromQueue() {
+    const queue: [string, string][] = []
 
-    await this.scrapeUser(user, learningLanguageId, userLanguageId)
+    for (const [lang, id] of this.lookupQueue.splice(0)) {
+      if (queue.some(x => x[0] === lang && x[1] === id))
+        continue
 
-    const track: LanguageTrack = {
-      learningLanguageId, userLanguageId,
+      const w = this.words.get(id)
 
-      userLanguage,
-      learningLanguage: user.language_data[learningLanguageId].language_string,
+      if (w !== undefined && w.word !== undefined)
+        continue
 
-      lessons: user.language_data[learningLanguageId].skills.map(skill => {
-        const words: WordId[] = []
-
-        for (const i in skill.progress_v3_debug_info.lexeme_ids_by_lesson)
-        for (const word of skill.progress_v3_debug_info.lexeme_ids_by_lesson[i])
-          words.push(word)
-
-        return {
-          id: skill.id,
-          name: skill.name,
-          title: skill.title,
-          shortName: skill.short,
-          explanation: skill.explanation,
-          dependencies: skill.dependencies_name,
-          words
-        } as Lesson
-      }),
-
-      words: {}
+      queue.push([lang, id])
     }
 
-    for (const lesson of track.lessons) {
-      lesson.dependencies = lesson.dependencies.map(name => track.lessons.find(x => x.name === name)!.id)
+    if (queue.length === 0)
+      return false
 
-      for (const wordId of lesson.words) {
-        const word = this.items.find(x => x.lexeme_id === wordId)
+    console.error('[i] Adding', queue.length, 'item(s) from queue.')
 
-        if (word !== undefined) {
-          track.words[wordId] = dicItemToWord(word)
-        } else {
-          const word = await this.fetchDictionaryItem(wordId, userLanguageId)
+    const tasks = queue.map(async ([lang, id]) => {
+      const item = await this.fetchDictionaryItem(id, lang)
 
-          if (typeof word === 'string') {
-            console.error('[-]', word)
+      if (typeof item === 'string')
+        return item
 
-            continue
-          }
-
-          console.error('[+] Adding word', wordId)
-
-          this.addWord(word)
-          await this.addFromQueue()
-
-          track.words[wordId] = dicItemToWord(word)
-        }
-      }
-    }
-
-    track.lessons.sort((a, b) => {
-      const skills = user.language_data[learningLanguageId].skills
-
-      const aSkills = skills.find(x => x.id === a.id)!,
-            bSkills = skills.find(x => x.id === b.id)!
-
-      return (aSkills.coords_y * 10 + aSkills.coords_x) - (bSkills.coords_y * 10 + bSkills.coords_x)
+      this.addWord(item)
     })
 
-    return track
-  }
-}
+    let timeout = 400
+    let prevDate = Date.now()
 
-function dicItemToWord(item: DictionaryItem): Word {
-  return {
-    id: item.lexeme_id,
-    word: item.word,
-    translations: item.translations,
-    examples: item.alternative_forms.map(x => ({ sentence: x.example_sentence, translation: x.translation })),
-    related: item.related_lexemes.map(x => x.url.substr(x.url.lastIndexOf('/') + 1))
+    for (let i = 0; i < tasks.length; i += MAX_PARALLEL_REQUESTS) {
+      const results = await Promise.all(tasks.slice(i, i + MAX_PARALLEL_REQUESTS))
+      const failedResults = results.filter(x => x !== undefined && x.includes('Too Many Requests'))
+
+      if (failedResults.length > 0) {
+        console.log('[!] We made two many requests, and must slow down a little bit.')
+
+        i -= MAX_PARALLEL_REQUESTS
+        timeout *= 2
+
+        this.failures -= failedResults.length
+
+        await new Promise(resolve => setTimeout(resolve, timeout))
+      } else if (prevDate > Date.now() - 1000) {
+        // Wait a little
+        await new Promise(resolve => setTimeout(resolve, timeout))
+      }
+
+      prevDate = Date.now()
+    }
+
+    return true
+  }
+
+  async writeLanguageTrack(user: User, learningLanguageId: string, userLanguageId: string, userLanguage: string) {
+    console.error('[i] Creating database file for', learningLanguageId, '/', userLanguageId + '.')
+
+    const lang = user.language_data[learningLanguageId]
+
+    if (lang === undefined)
+      return `User\'s current learning language is not set to ${learningLanguageId}.\nPlease updating it before attempting to invoke this method.`
+
+    serializeLanguageTrackHeader(this.out, lang.language_string, learningLanguageId, userLanguage, userLanguageId)
+
+    // Sort skills by order in which they're shown to the user
+    lang.skills.sort((a, b) => (a.coords_y * 10 + a.coords_x) - (b.coords_y * 10 + b.coords_x))
+
+    for (let i = 0; i < lang.skills.length; i++) {
+      const skill = lang.skills[i]
+
+      console.error('[i] Adding lesson', skill.title, `(${i + 1}/${lang.skills.length}), with`, skill.words.length, 'words.')
+
+      // Serialize skill into lesson
+      this.skillToLesson(skill, userLanguageId)
+
+      // Serialize all dependent words as well
+      while (await this.addFromQueue()) {
+        // Nop.
+      }
+    }
   }
 }

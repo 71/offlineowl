@@ -26,20 +26,6 @@ export interface DictionaryItem {
   related_lexemes: { anchor: string, url: string }[]
 }
 
-export type CompletionLanguages<A extends string, B extends string> = {
-  [Language in A | B]: {
-    lexemeId: string
-    matchedLanguageId: A | B
-    matchedText: string
-  }[]
-}
-
-export type Completion<A extends string = string, B extends string = string> = CompletionLanguages<A, B> & {
-  languageId: A
-  uiLanguageId: B
-  word: string
-}
-
 export interface PointsData {
   languages: any[]
   total: number
@@ -129,7 +115,7 @@ export interface Skill {
   description: string
   index: number
   bonus: boolean
-  explanation: string
+  explanation: string | null
   num_lexemes: number
   num_missing: number
   comment_data: CommentData

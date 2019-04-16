@@ -42,18 +42,23 @@ if (learningLanguage == undefined || userLanguage === undefined)
 
 
 // Scrap things
-const scrapper = new Scrapper()
+async function run() {
+  const scrapper = new Scrapper(process.stdout)
+  const user = await scrapper.fetchUserData(username)
 
-scrapper
-  .fetchUserData(username)
-  .then(user => {
-    if (typeof user === 'string') {
-      console.warn(user)
+  if (typeof user === 'string') {
+    console.error('[-]', user)
 
-      return process.exit(2)
-    }
+    return process.exit(2)
+  }
 
-    scrapper
-      .createDbLanguageTrack(user, learningLanguageId, userLanguageId, userLanguage)
-      .then(track => console.log(JSON.stringify(track)))
-  })
+  const err = await scrapper.writeLanguageTrack(user, learningLanguageId, userLanguageId, userLanguage)
+
+  if (typeof err === 'string') {
+    console.error('[-]', err)
+
+    return process.exit(2)
+  }
+}
+
+run()
