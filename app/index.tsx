@@ -2,8 +2,8 @@ import { h } from 'ricochet'
 
 import 'material-components-web/dist/material-components-web.min.css'
 
-import { App }   from './ts/App'
-import { Store } from './ts/store'
+import { App } from './ts/App'
+import { Database } from './ts/db'
 
 
 // Register web worker
@@ -18,11 +18,9 @@ if (navigator.serviceWorker) {
 
 // Set up app
 (async function() {
+  const db = window['db'] = new Database()
   const app = document.getElementById('app')!
-  const store = window['store'] = new Store()
-
-  await store.init()
 
   // Set up view
-  app.appendChild(<App store={store} />)
+  app.appendChild(<App db={db} />)
 })()

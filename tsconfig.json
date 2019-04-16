@@ -4,9 +4,10 @@
     "jsxFactory": "h",
     "module": "commonjs",
     "strict": true,
-    "target": "es2015",
+    "target": "es2018",
   },
-  "files": [
-    "src/**/*.ts"
+  "include": [
+    "app/**/*.ts",
+    "bin/**/*.ts",
   ]
 }

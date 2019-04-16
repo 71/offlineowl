@@ -1,25 +1,29 @@
 {
   "name": "offlineowl",
   "version": "1.0.0",
-  "description": "Offline Duolingo vocabulary.",
-  "main": "index.js",
+  "description": "Generate and view offline vocabulary database using Duolingo.",
   "repository": "https://github.com/71/offlineowl",
   "author": "Grégoire Geis",
   "license": "Unlicense",
   "scripts": {
     "build": "parcel build src/index.pug",
-    "start": "parcel src/index.pug"
+    "start": "parcel src/index.pug",
+    "deploy": "parcel build src/index.pug --public-url /offlineowl/ --experimental-scope-hoisting && gh-pages -d dist",
+    "scrap:en-ko": "ts-node bin/index.ts gregoiregeis ko en > data/en-ko.json"
   },
   "devDependencies": {
-    "@material/textfield": "^1.1.1",
     "@mdi/js": "^3.6.95",
+    "@types/node": "^11.13.4",
+    "gh-pages": "^2.0.1",
     "idb-keyval": "^3.2.0",
     "material-components-web": "^1.1.1",
+    "node-fetch": "^2.3.0",
     "parcel-bundler": "^1.12.3",
     "parcel-plugin-sw-precache": "^1.1.1",
     "pug": "^2.0.3",
     "ricochet": "file:../ricochet",
     "stylus": "^0.54.5",
+    "ts-node": "^8.1.0",
     "typescript": "^3.4.3"
   },
   "browserslist": [

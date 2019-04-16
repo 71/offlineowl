@@ -1,18 +1,12 @@
 import { h, eventListener, attach, Observable } from 'ricochet'
-import { BuiltinSubject, compute }                       from 'ricochet/reactive'
+import { observableArray }                      from 'ricochet/array'
+import { compute, BuiltinSubject, subject }     from 'ricochet/reactive'
 
 import { MDCSelect }    from '@material/select'
 import { MDCTextField } from '@material/textfield'
 
-import { Store, DictionaryItem } from './store'
+import { Database, availableLanguages, Word } from './db'
 
-
-const availableLanguages = {
-  'en': 'English',
-  'fr': 'French',
-  'ja': 'Japanese',
-  'ko': 'Korean',
-}
 
 function raw(value: string) {
   const wrapper = document.createElement('div')
@@ -25,6 +19,7 @@ function late(ctor: { new(element: Element): any }) {
     setTimeout(() => new ctor(element), 1)
   }
 }
+
 
 function Select({ text, items, selected }: { text: string, items: Record<string, string>, selected: BuiltinSubject<string> }) {
   const input$ = eventListener('input')
@@ -55,26 +50,41 @@ function Select({ text, items, selected }: { text: string, items: Record<string,
   )
 }
 
+
 export interface AppProps {
-  store: Store
+  db: Database
 }
 
-export function App({ store }: AppProps) {
+export function App({ db }: AppProps) {
+  const searchQuery$  = subject(localStorage.getItem('query') || '')
+  const userLang$     = subject(localStorage.getItem('user-lang') || 'en')
+  const learningLang$ = subject(localStorage.getItem('learning-lang') || 'fr')
+
+  const track$ = compute($ => db.loadByName($(learningLang$), $(userLang$)))
+  const items$ = observableArray<Word>()
+
+  attach(
+    searchQuery$.subscribe(v => localStorage.setItem('query', v)),
+    userLang$.subscribe(v => localStorage.setItem('user-lang', v)),
+    learningLang$.subscribe(v => localStorage.setItem('learning-lang', v)),
+
+    track$.subscribe(track => track.then(x => items$.splice(0, undefined, ...Object.values(x.words)))),
+  )
+
+
   const inputEvent$ = eventListener('input')
-  const displayItem = new WeakMap<DictionaryItem, Observable<'block' | 'none'>>()
+  const displayItem = new WeakMap<Word, Observable<'block' | 'none'>>()
 
   let ignore = false
-  let lastTimeout = 0
 
-  function display$(item: DictionaryItem) {
+  function display$(item: Word) {
     let d$ = displayItem.get(item)
 
     if (d$ === undefined) {
       d$ = compute($ =>
-        (item.from_language === $(store.languageFrom)) &&
-        (item.learning_language === $(store.languageTo)) &&
-        (item.word.includes($(store.searchQuery)) || item.translations.includes($(store.searchQuery)))
-          ? 'block' : 'none'
+        (item.word.includes($(searchQuery$)) || item.translations.includes($(searchQuery$)))
+          ? 'block'
+          : 'none'
       )
 
       displayItem.set(item, d$)
@@ -88,30 +98,20 @@ export function App({ store }: AppProps) {
       if (ignore) return
 
       ignore = true
-      store.searchQuery.next((e.target as HTMLInputElement).value)
+      searchQuery$.next((e.target as HTMLInputElement).value)
       ignore = false
-
-      if (lastTimeout !== 0)
-        clearTimeout(lastTimeout)
-
-      lastTimeout = setTimeout(() => {
-        lastTimeout = 0
-
-        if (navigator.onLine)
-          store.addWords(store.searchQuery.value, store.languageTo.value, store.languageFrom.value)
-      })
     }),
   )
 
   function goToWord(this: HTMLAnchorElement) {
-    store.searchQuery.next(this.innerText)
+    searchQuery$.next(this.getAttribute('data-id'))
   }
 
   return (
     <div class='app'>
       <div class='header mdc-elevation--z4'>
         <div class='search-box mdc-text-field mdc-text-field--outlined' connect={late(MDCTextField)}>
-          <input type='text' id='tf-outlined' class='mdc-text-field__input' connect={inputEvent$} value={store.searchQuery} />
+          <input type='text' id='tf-outlined' class='mdc-text-field__input' connect={inputEvent$} value={searchQuery$} />
           <div class='mdc-notched-outline'>
             <div class='mdc-notched-outline__leading'></div>
             <div class='mdc-notched-outline__notch'>
@@ -123,37 +123,39 @@ export function App({ store }: AppProps) {
           </div>
         </div>
 
-        <Select items={availableLanguages} selected={store.languageFrom} text='From' />
-        <Select items={availableLanguages} selected={store.languageTo}   text='To' />
+        <Select items={availableLanguages} selected={userLang$} text='From' />
+        <Select items={{ any: 'Any', ...availableLanguages }} selected={learningLang$} text='To' />
       </div>
 
       <ul class='items'>
-        { store.items.sync(item =>
+        { items$.sync(item =>
           <li class='item mdc-elevation--z4' style={{ display: display$(item) }}>
             <div class='item-content'>
               <table>
-                <tr class='from'>
-                  <th>{item.from_language_name}</th>
-                  <th>{item.learning_language_name}</th>
+                <tr class='lang-name'>
+                  <th>{availableLanguages[userLang$.value]}</th>
+                  <th>{availableLanguages[learningLang$.value]}</th>
                 </tr>
 
-                <tr class='to'>
+                <tr class='main'>
                   <td>{item.translations}</td>
                   <td>{item.word}</td>
                 </tr>
 
-                { item.alternative_forms.map(x =>
+                { item.examples.map(x =>
                   <tr>
                     <td>{raw(x.translation)}</td>
-                    <td>{raw(x.example_sentence)}</td>
+                    <td>{raw(x.sentence)}</td>
                   </tr>
                 ) }
               </table>
 
-              { item.related_lexemes.length !== 0 &&
+              { item.related.length !== 0 &&
                 <div class='related'>
-                  { item.related_lexemes.map(x =>
-                    <div><a href='#' onclick={goToWord}>{x.anchor}</a></div>
+                  { item.related.map(x =>
+                    <div>
+                      <a href='#' onclick={goToWord} data-id={x}>{db.words[x].word}</a>
+                    </div>
                   ) }
                 </div>
               }
