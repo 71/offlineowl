@@ -9,8 +9,8 @@ do not have lessons built into the app, and therefore cannot be studied offline.
 
 This repository provides two projects:
 - In [`bin`](./bin), a Node.JS CLI app can scrape a Duolingo course to export all
-  vocabulary and lessons from it, generating a JSON file.
-- In [`app`](./app), an offline-first PWA that can query the generated JSON file
+  vocabulary and lessons from it, generating a `.dat` file.
+- In [`app`](./app), an offline-first PWA that can query the generated `.dat` file
   is provided.
 
 Since recent JavaScript features are used throughout the project, both the browser

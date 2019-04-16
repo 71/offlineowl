@@ -8,7 +8,7 @@
   "scripts": {
     "build": "parcel build app/index.pug",
     "start": "parcel app/index.pug",
-    "deploy": "parcel build app/index.pug --public-url /offlineowl/ --experimental-scope-hoisting && gh-pages -d dist",
+    "deploy": "parcel build app/index.pug --public-url /offlineowl/ && gh-pages -d dist",
     "scrap:en-ko": "ts-node bin/index.ts gregoiregeis ko en > dist/en-ko.dat",
     "scrap:en-ja": "ts-node bin/index.ts gregoiregeis ja en > dist/en-ja.dat",
     "scrap:en-fr": "ts-node bin/index.ts gregoiregeis fr en > dist/en-fr.dat"

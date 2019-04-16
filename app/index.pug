@@ -1,11 +1,15 @@
 doctype html
 
-html
+html(lang='en')
   head
-    meta(charset='utf-8')
-
     title Offline Owl
 
+    meta(charset='utf-8')
+    meta(name='viewport'   , content='width=device-width, initial-scale=1')
+    meta(name='theme-color', content='#1971c2')
+    meta(name='description', content='Offline dictionary and lessons from Duolingo.')
+
+    link(rel='manifest'  , href='./manifest.webmanifest')
     link(rel='stylesheet', href='./index.styl')
 
   body

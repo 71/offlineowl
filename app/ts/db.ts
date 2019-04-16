@@ -1,11 +1,11 @@
-import { get, set }    from 'idb-keyval'
+import { get, set } from 'idb-keyval'
 
 
-const fourbytes = new ArrayBuffer(4)
+const fourbytes   = new ArrayBuffer(4)
 const fourbytesDv = new DataView(fourbytes)
 
 const lessonMagic = new Uint8Array([0])
-const wordMagic = new Uint8Array([1])
+const wordMagic   = new Uint8Array([1])
 
 const MAGIC = new Uint8Array([224, 204, 62, 91])
 

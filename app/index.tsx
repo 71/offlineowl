@@ -8,7 +8,7 @@ import { Database } from './ts/db'
 
 // Register web worker
 if (navigator.serviceWorker) {
-  const serviceWorkerName = '/service-worker.js'
+  const serviceWorkerName = process.env.NODE_ENV === 'development' ? '/service-worker.js' : '/offlineowl/service-worker.js'
 
   navigator.serviceWorker
     .register(serviceWorkerName)
