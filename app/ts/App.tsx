@@ -103,8 +103,10 @@ export function App({ db }: AppProps) {
     }),
   )
 
-  function goToWord(this: HTMLAnchorElement) {
-    searchQuery$.next(this.href.substr(this.href.lastIndexOf('/#/') + 3))
+  function goToWord(this: HTMLAnchorElement, e: Event) {
+    e.preventDefault()
+
+    searchQuery$.next(decodeURIComponent(this.href.substr(this.href.lastIndexOf('#/') + 2)))
   }
 
   return (
@@ -154,7 +156,7 @@ export function App({ db }: AppProps) {
                 <div class='related'>
                   { item.related.map(x =>
                     <div>
-                      <a href={'/#/' + x.translations} onclick={goToWord}>{x.word}</a>
+                      <a href={'#/' + x.translations} onclick={goToWord}>{x.word}</a>
                     </div>
                   ) }
                 </div>
