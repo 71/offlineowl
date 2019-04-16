@@ -104,7 +104,7 @@ export function App({ db }: AppProps) {
   )
 
   function goToWord(this: HTMLAnchorElement) {
-    searchQuery$.next(this.getAttribute('data-id'))
+    searchQuery$.next(this.href.substr(this.href.lastIndexOf('/#/') + 3))
   }
 
   return (
@@ -124,7 +124,7 @@ export function App({ db }: AppProps) {
         </div>
 
         <Select items={availableLanguages} selected={userLang$} text='From' />
-        <Select items={{ any: 'Any', ...availableLanguages }} selected={learningLang$} text='To' />
+        <Select items={availableLanguages} selected={learningLang$} text='To' />
       </div>
 
       <ul class='items'>
@@ -154,7 +154,7 @@ export function App({ db }: AppProps) {
                 <div class='related'>
                   { item.related.map(x =>
                     <div>
-                      <a href='#' onclick={goToWord} data-id={x.id}>{x.word}</a>
+                      <a href={'/#/' + x.translations} onclick={goToWord}>{x.word}</a>
                     </div>
                   ) }
                 </div>
