@@ -66,9 +66,7 @@ export class Database {
   readonly languages: Record<LanguageId, LanguageTrack> = {}
   readonly words    : Record<WordId, Word> = {}
 
-  load(json: string) {
-    const languageTrack = JSON.parse(json) as LanguageTrack
-
+  load(languageTrack: LanguageTrack) {
     this.languages[languageTrack.learningLanguageId] = languageTrack
 
     for (const lesson of languageTrack.lessons)
@@ -80,24 +78,24 @@ export class Database {
 
   async loadByName(learningLanguageId: string, userLanguageId: string) {
     const trackId = `${userLanguageId}-${learningLanguageId}`
-    const cachedTrack = await get<string>(trackId)
+    const cachedTrack = await get<LanguageTrack>(trackId)
 
     if (cachedTrack !== undefined)
       return this.load(cachedTrack)
 
-    let json: string
+    let track: LanguageTrack
 
     switch (`${userLanguageId}-${learningLanguageId}`) {
       case 'en-ko':
-        json = await import('../../data/en-ko.json')
+        track = await import('../../data/en-ko.json') as LanguageTrack
         break
 
       default:
         throw new Error('Could not import unknown course.')
     }
 
-    await set(trackId, json)
+    await set(trackId, track)
 
-    return this.load(json)
+    return this.load(track)
   }
 }

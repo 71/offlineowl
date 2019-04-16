@@ -4,13 +4,17 @@ Offline Owl
 
 I really like [Duolingo]; however, even as a [Plus](https://www.duolingo.com/plus) subscriber,
 their amazing [dictionary] remains online-only, which prevents me from looking up words
-I have forgotten on-the-go while in Korea.
+I have forgotten on-the-go while in Korea. Additionally, some courses (such as the Korean one)
+do not have lessons built into the app, and therefore cannot be studied offline.
 
-This web-app provides an interface similar to [Duolingo]'s [dictionary], with an added detail:
-**all queried words are saved to the browser's storage**, which allows anyone to bring up
-the website offline to lookup cached words.
+This repository provides two projects:
+- In [`bin`](./bin), a Node.JS CLI app can scrape a Duolingo course to export all
+  vocabulary and lessons from it, generating a JSON file.
+- In [`app`](./app), an offline-first PWA that can query the generated JSON file
+  is provided.
 
-A pretty recent browser is needed.
+Since recent JavaScript features are used throughout the project, both the browser
+and Node.JS must have relatively recent versions.
 
 
 [Duolingo]: https://duolingo.com

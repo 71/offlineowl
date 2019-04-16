@@ -6,9 +6,9 @@
   "author": "Grégoire Geis",
   "license": "Unlicense",
   "scripts": {
-    "build": "parcel build src/index.pug",
-    "start": "parcel src/index.pug",
-    "deploy": "parcel build src/index.pug --public-url /offlineowl/ --experimental-scope-hoisting && gh-pages -d dist",
+    "build": "parcel build app/index.pug",
+    "start": "parcel app/index.pug",
+    "deploy": "parcel build app/index.pug --public-url /offlineowl/ --experimental-scope-hoisting && gh-pages -d dist",
     "scrap:en-ko": "ts-node bin/index.ts gregoiregeis ko en > data/en-ko.json"
   },
   "devDependencies": {

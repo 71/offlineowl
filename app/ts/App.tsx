@@ -128,7 +128,7 @@ export function App({ db }: AppProps) {
       </div>
 
       <ul class='items'>
-        { items$.sync(item =>
+        { items$.sync((item, i) => i < 100 &&
           <li class='item mdc-elevation--z4' style={{ display: display$(item) }}>
             <div class='item-content'>
               <table>

@@ -3,6 +3,7 @@ import { User, DictionaryItem, Completion } from './types'
 import { LanguageTrack, Lesson, WordId, Word } from '../app/ts/db'
 
 const fetch: typeof window.fetch = require('node-fetch')
+const MAX_PARALLEL_REQUESTS = 10
 
 
 export class Scrapper {
@@ -16,7 +17,7 @@ export class Scrapper {
   private reportFailure() {
     if (this.failures++ > 20) {
       // Ten failures is a lot, we probably have a rate-limiting problem
-      console.warn('Too many failures in the past requests; aborting.')
+      console.error('[-] Too many failures in the past requests; aborting.')
 
       process.exit(3)
     }
@@ -33,7 +34,7 @@ export class Scrapper {
       if (!res.ok) {
         this.reportFailure()
 
-        return `Error fetching item #${id}: ${res.statusText || `Error ${res.status}`}.`
+        return `Error fetching item ${id}: ${res.statusText || `Error ${res.status}`}.`
       }
 
       return await res.json() as DictionaryItem
@@ -70,20 +71,20 @@ export class Scrapper {
       queue.push([lang, id])
     }
 
-    console.log('Adding at most', queue.length, 'item(s) from queue.')
+    console.error('[i] Adding at most', queue.length, 'item(s) from queue.')
 
     const tasks = queue.map(async ([lang, id]) => {
       const item = await this.fetchDictionaryItem(id, lang)
 
       if (typeof item === 'string')
-        return console.log('Not adding item:', item)
+        return console.error('[-] Not adding item:', item)
 
-      console.log('Adding', item)
+      console.error('[+] Adding', item)
       this.addWord(item)
     })
 
-    for (let i = 0; i < tasks.length; i += 10)
-      await Promise.all(tasks.slice(i, i + 10))
+    for (let i = 0; i < tasks.length; i += MAX_PARALLEL_REQUESTS)
+      await Promise.all(tasks.slice(i, i + MAX_PARALLEL_REQUESTS))
   }
 
   async fetchUserData(username: string) {
@@ -109,18 +110,19 @@ export class Scrapper {
         ids.push(id)
     }
 
-    console.log('Found', ids.length, 'item(s) to scrape.')
+    console.error('[i] Found', ids.length, 'item(s) to scrape.')
 
-    await Promise.all(
-      ids.map(async id => {
-        const item = await this.fetchDictionaryItem(id, intoLanguage)
+    for (let i = 0; i < ids.length; i += MAX_PARALLEL_REQUESTS)
+      await Promise.all(
+        ids.slice(i, i + MAX_PARALLEL_REQUESTS).map(async id => {
+          const item = await this.fetchDictionaryItem(id, intoLanguage)
 
-        if (typeof item === 'string')
-          return console.warn(item)
+          if (typeof item === 'string')
+            return console.error('[-]', item)
 
-        this.addWord(item)
-      })
-    )
+          this.addWord(item)
+        })
+      )
   }
 
   addCompletion(completion: Completion) {
@@ -133,7 +135,7 @@ export class Scrapper {
   }
 
   async createDbLanguageTrack(user: User, learningLanguageId: string, userLanguageId: string, userLanguage: string): Promise<LanguageTrack> {
-    console.log('Creating db.json file for', learningLanguageId, '/', userLanguageId + '.')
+    console.error('[i] Creating db.json file for', learningLanguageId, '/', userLanguageId + '.')
 
     await this.scrapeUser(user, learningLanguageId, userLanguageId)
 
@@ -176,12 +178,12 @@ export class Scrapper {
           const word = await this.fetchDictionaryItem(wordId, userLanguageId)
 
           if (typeof word === 'string') {
-            console.warn(word)
+            console.error('[-]', word)
 
             continue
           }
 
-          console.log('Adding word', wordId)
+          console.error('[+] Adding word', wordId)
 
           this.addWord(word)
           await this.addFromQueue()

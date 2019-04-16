@@ -5,6 +5,7 @@
     "module": "commonjs",
     "strict": true,
     "target": "es2018",
+    "resolveJsonModule": true
   },
   "include": [
     "app/**/*.ts",
